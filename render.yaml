@@ -1,0 +1,7 @@
+# Конфиг Render: приложение Flask в web_app.py, не в app.py
+services:
+  - type: web
+    name: triumph-gym
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 2

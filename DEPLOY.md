@@ -10,8 +10,10 @@
 
 3. **New** → **Web Service** → подключите репозиторий:
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** из `Procfile` подхватится сам, или:  
+   - **Start Command** (обязательно именно так, не `app:app`):  
      `gunicorn web_app:app --bind 0.0.0.0:$PORT`
+
+   > Ошибка `Failed to find attribute 'app' in 'app'` — в Start Command указан неверный модуль. Нужен **web_app:app**, потому что Flask-приложение в файле `web_app.py`.
 
 4. В **Environment** добавьте:
 
