@@ -1,0 +1,32 @@
+{% extends "member/base.html" %}
+{% block title %}Триумф — вход{% endblock %}
+{% block body_class %}member-app--auth{% endblock %}
+
+{% block shell %}
+<div class="member-login-wrap">
+    {% include 'member/_decor.html' %}
+<div class="member-login-hero member-login-hero--glass member-glow-border">
+    <div class="member-brand-mark member-brand-mark--lg" aria-hidden="true">Т</div>
+    <h1 class="member-text-shine">Триумф</h1>
+    <p class="muted">Личный кабинет участника</p>
+
+    {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+            <p class="member-flash">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="post" class="member-form" autocomplete="on">
+        <input name="phone" type="tel" placeholder="Телефон" required autocomplete="tel">
+        <input name="pin" type="password" inputmode="numeric" placeholder="PIN-код" required autocomplete="current-password" maxlength="8">
+        <button type="submit" class="member-btn member-btn--shine">Войти</button>
+    </form>
+
+    <p class="member-login-hint">
+        Первый вход: телефон из базы зала и <strong>последние 4 цифры</strong> номера.
+        PIN можно сменить в профиле после входа.
+    </p>
+    <a href="/login" class="member-btn member-btn--ghost" style="margin-top: 0.5rem;">Вход для персонала</a>
+</div>
+</div>
+{% endblock %}

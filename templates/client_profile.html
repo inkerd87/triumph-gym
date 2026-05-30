@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card neon-glow">
+    <h2>Профиль: {{ client.full_name }}</h2>
+    <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
+        <p><b>Категория:</b> <span class="badge">{{ category_label(client.category) }}</span></p>
+        <p><b>Телефон:</b> <span class="muted">{{ client.phone }}</span></p>
+        <p><b>Email:</b> <span class="muted">{{ client.email or 'Не указан' }}</span></p>
+        <p><b>Дата регистрации:</b> <span class="muted">{{ client.created_at.strftime('%Y-%m-%d %H:%M') if client.created_at else 'Неизвестно' }}</span></p>
+    </div>
+</section>
+
+<div class="bento-grid" style="margin-top: 1.5rem;">
+    <section class="card">
+        <h3>Абонементы</h3>
+        {% if client.memberships %}
+        <ul style="list-style: none; padding: 0; margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+            {% for cm in client.memberships %}
+            <li style="padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <b>{{ cm.membership.name }}</b>
+                    {% if cm.end_date >= today %}
+                        <span class="badge" style="background: rgba(225, 6, 0, 0.25); color: #ff4444; border: 1px solid rgba(225, 6, 0, 0.5);">Активен</span>
+                    {% else %}
+                        <span class="badge" style="background: rgba(255, 255, 255, 0.08); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.15);">Истек</span>
+                    {% endif %}
+                </div>
+                <p class="muted" style="margin: 0; font-size: 0.9em;">С {{ cm.start_date }} до {{ cm.end_date }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted" style="margin-top: 1rem;">Нет абонементов.</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h3>История визитов</h3>
+        {% if client.visits %}
+        <ul style="list-style: none; padding: 0; margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+            {% for v in client.visits|sort(attribute='visit_date', reverse=True) %}
+                {% if loop.index <= 10 %} <!-- show last 10 -->
+                <li style="padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b>{{ v.visit_date }}</b>
+                        <span class="muted" style="font-size: 0.9em;">Тренер: {{ v.trainer.full_name if v.trainer else 'Нет' }}</span>
+                    </div>
+                    {% if v.note %}
+                    <p class="muted" style="margin: 0.5rem 0 0 0; font-size: 0.9em;">Заметка: {{ v.note }}</p>
+                    {% endif %}
+                </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted" style="margin-top: 1rem;">Нет визитов.</p>
+        {% endif %}
+    </section>
+</div>
+
+<div class="bento-grid" style="margin-top: 1.5rem;">
+    <section class="card" style="grid-column: 1 / -1;">
+        <h3>Настройки профиля</h3>
+        <form method="post" action="/clients/{{ client.id }}/update" class="form" style="margin-top: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">ФИО</label>
+                    <input name="full_name" value="{{ client.full_name }}" required pattern="^[A-Za-zА-Яа-яЁё\s]+$" minlength="2">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">Телефон</label>
+                    <input name="phone" value="{{ client.phone }}" required pattern="^\+?[0-9\s\-\(\)]+$">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">Email</label>
+                    <input type="email" name="email" value="{{ '' if client.email == '-' else (client.email or '') }}">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">Категория</label>
+                    <select name="category" required>
+                        <option value="client" {% if client.category == 'client' %}selected{% endif %}>Стандарт</option>
+                        <option value="vip" {% if client.category == 'vip' %}selected{% endif %}>VIP статус</option>
+                        <option value="trainer" {% if client.category == 'trainer' %}selected{% endif %}>Тренер-клиент</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">PIN для приложения</label>
+                    <input name="new_pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" placeholder="Новый PIN (4–8 цифр)" autocomplete="new-password">
+                    <p class="muted" style="font-size: 0.8rem; margin-top: 0.35rem;">
+                        {% if client.uses_default_pin %}
+                            Сейчас: последние 4 цифры телефона
+                        {% else %}
+                            PIN задан персонально
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-start; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem; flex-wrap: wrap;">
+                <button type="submit" class="btn">Сохранить изменения</button>
+                <button type="submit" form="delete-form" class="btn btn-ghost" style="color: var(--danger); border-color: rgba(255,51,102,0.3);" onclick="return confirm('Вы уверены, что хотите удалить участника? Действие необратимо.')">Удалить участника</button>
+            </div>
+        </form>
+        <form id="delete-form" method="post" action="/clients/{{ client.id }}/delete" style="display: none;"></form>
+    </section>
+</div>
+{% endblock %}

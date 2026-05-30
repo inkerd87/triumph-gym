@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card neon-glow"
+    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h2>Расписание занятий</h2>
+        <p class="muted">Неделя: {{ target_monday.strftime('%d.%m.%Y') }} — {{ target_sunday.strftime('%d.%m.%Y') }}</p>
+    </div>
+
+    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <!-- Фильтр по тренеру -->
+        <form method="get" action="/schedule" style="margin: 0;" data-ajax="false">
+            <input type="hidden" name="week_offset" value="{{ week_offset }}">
+            <select name="trainer_id" onchange="this.form.submit()" class="btn btn-ghost" style="padding: 0.5rem 1rem; cursor: pointer; outline: none;">
+                <option value="" style="background: var(--bg-dark); color: white;">Все тренеры</option>
+                {% for t in trainers %}
+                <option value="{{ t.id }}" {% if selected_trainer == t.id|string %}selected{% endif %} style="background: var(--bg-dark); color: white;">{{ t.full_name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <form method="get" action="/schedule" style="margin: 0;" data-ajax="false">
+            <input type="hidden" name="week_offset" value="{{ week_offset - 1 }}">
+            <input type="hidden" name="trainer_id" value="{{ selected_trainer }}">
+            <button type="submit" class="btn btn-ghost">&larr; Прошлая</button>
+        </form>
+
+        {% if week_offset != 0 %}
+        <form method="get" action="/schedule" style="margin: 0;" data-ajax="false">
+            <input type="hidden" name="week_offset" value="0">
+            <input type="hidden" name="trainer_id" value="{{ selected_trainer }}">
+            <button type="submit" class="btn btn-ghost">Текущая</button>
+        </form>
+        {% endif %}
+
+        <form method="get" action="/schedule" style="margin: 0;" data-ajax="false">
+            <input type="hidden" name="week_offset" value="{{ week_offset + 1 }}">
+            <input type="hidden" name="trainer_id" value="{{ selected_trainer }}">
+            <button type="submit" class="btn btn-ghost">Следующая &rarr;</button>
+        </form>
+    </div>
+</section>
+
+<div class="bento-grid">
+    <!-- Календарь Time-Grid -->
+    <section class="card" style="grid-column: 1 / -1; overflow-x: auto; padding: 1.5rem 0.5rem;">
+        <div class="time-grid-container" style="min-width: 900px;">
+            <!-- Header (Days) -->
+            <div style="display: grid; grid-template-columns: 60px repeat(7, 1fr); gap: 0; margin-bottom: 1rem;">
+                <div></div> <!-- Empty top-left corner -->
+                {% set days = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'] %}
+                {% for day_idx in range(7) %}
+                    {% set current_date = target_monday + timedelta(days=day_idx) %}
+                    {% set is_today = current_date == today %}
+                    <div style="text-align: center; border-bottom: 2px solid {% if is_today %}var(--accent){% else %}rgba(255,255,255,0.1){% endif %}; padding-bottom: 0.5rem;">
+                        <h3 style="margin-bottom: 0.2rem; font-size: 1.1em; color: {% if is_today %}var(--accent){% else %}inherit{% endif %};">{{ days[day_idx] }}</h3>
+                        <p class="muted" style="margin: 0; font-size: 0.9em;">{{ current_date.strftime('%d.%m') }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Grid Body -->
+            <div style="display: grid; grid-template-columns: 60px repeat(7, 1fr); gap: 0; position: relative;">
+                
+                <!-- Time Axis -->
+                <div style="position: relative; height: 960px;">
+                    {% for hour in range(8, 24) %}
+                    <div style="position: absolute; top: {{ (hour - 8) * 60 }}px; right: 10px; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-muted);">
+                        {{ "%02d:00" | format(hour) }}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Day Columns -->
+                {% for day_idx in range(7) %}
+                    {% set current_date = target_monday + timedelta(days=day_idx) %}
+                    {% set day_layouts = layout_by_date.get(current_date, []) %}
+                    <div class="grid-day-col" style="position: relative; height: 960px; border-left: 1px solid rgba(255,255,255,0.05); border-right: {% if loop.last %}1px solid rgba(255,255,255,0.05){% else %}none{% endif %};">
+                        
+                        <!-- Grid Lines -->
+                        {% for hour in range(8, 24) %}
+                        <div style="position: absolute; top: {{ (hour - 8) * 60 }}px; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.05);"></div>
+                        {% endfor %}
+
+                        <!-- Sessions -->
+                        {% for layout in day_layouts %}
+                        {% set session_item = layout.session %}
+                        <div class="time-grid-item" style="
+                            position: absolute; 
+                            top: {{ layout.top }}px; 
+                            height: {{ layout.height }}px; 
+                            --base-height: {{ layout.height }}px;
+                            left: {{ layout.left }}%; 
+                            width: {{ layout.width }}%;
+                            padding: 2px;
+                            z-index: 10;
+                            cursor: pointer;
+                        "
+                        data-id="{{ session_item.id }}"
+                        data-title="{{ session_item.title }}"
+                        data-time="{{ session_item.start_time.strftime('%H:%M') }} - {{ (session_item.start_time + timedelta(minutes=session_item.duration_minutes)).strftime('%H:%M') }}"
+                        data-client="{{ session_item.client.full_name if session_item.client else '' }}"
+                        data-trainer="{{ session_item.trainer.full_name if session_item.trainer else 'Без тренера' }}"
+                        data-note="{{ session_item.note or '' }}"
+                        onclick="openSessionModal(this)">
+                            <div class="neon-glow" style="
+                                background: rgba(0, 0, 0, 0.8); 
+                                border: 1px solid rgba(255,255,255,0.1);
+                                border-left: 4px solid var(--accent); 
+                                border-radius: 6px; 
+                                width: 100%; 
+                                height: 100%; 
+                                padding: 0.4rem; 
+                                overflow: hidden;
+                                display: flex;
+                                flex-direction: column;
+                            ">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.2rem;">
+                                    <strong style="font-size: 0.85em; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff;">{{ session_item.title }}</strong>
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 0.3rem;">
+                                    {{ session_item.start_time.strftime('%H:%M') }} - {{ (session_item.start_time + timedelta(minutes=session_item.duration_minutes)).strftime('%H:%M') }}
+                                </div>
+                                {% if session_item.client %}
+                                <div style="font-size: 0.75rem; color: rgba(255,255,255,0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 4px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                    <span style="overflow: hidden; text-overflow: ellipsis;">{{ session_item.client.full_name }}</span>
+                                </div>
+                                {% endif %}
+                                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    {{ session_item.trainer.full_name if session_item.trainer else 'Без тренера' }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Добавление занятия -->
+    <section class="card neon-glow" style="grid-column: 1 / -1; margin-top: 1rem; width: 100%;">
+        <h3 style="margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
+            Добавить занятие</h3>
+        <form method="post" action="/schedule" id="add-session-form" novalidate
+            style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+            <input type="hidden" name="action" value="create">
+            <input type="hidden" name="week_offset" value="{{ week_offset }}">
+
+            <input type="hidden" name="selected_trainer" value="{{ selected_trainer }}">
+
+            <div class="form-group" style="flex: 2; min-width: 180px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Название (групп.)</label>
+                <input type="text" name="title" placeholder="Или оставьте пустым для ПТ" class="t-input">
+            </div>
+
+            <div class="form-group" style="flex: 2; min-width: 180px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Клиент (для ПТ)</label>
+                <select name="client_id" class="t-input">
+                    <option value="">-- Без клиента (Групповая) --</option>
+                    {% for c in clients %}
+                    <option value="{{ c.id }}">{{ c.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" style="flex: 1; min-width: 140px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Дата</label>
+                <input type="date" name="date" required value="{{ today.strftime('%Y-%m-%d') }}" class="t-input">
+            </div>
+
+            <div class="form-group" style="flex: 1; min-width: 100px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Время</label>
+                <input type="time" name="time" required value="18:00" class="t-input">
+            </div>
+
+            <div class="form-group" style="flex: 2; min-width: 180px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Тренер</label>
+                <select name="trainer_id" required class="t-input">
+                    <option value="">-- Выберите тренера --</option>
+                    {% for t in trainers %}
+                    <option value="{{ t.id }}" {% if selected_trainer == t.id|string %}selected{% endif %}>{{ t.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" style="flex: 1; min-width: 80px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Длит. (мин)</label>
+                <input type="number" name="duration_minutes" required value="60" min="15" step="5" class="t-input">
+            </div>
+
+            <div class="form-group" style="flex: 1; min-width: 120px; position: relative;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Заметка</label>
+                <input type="text" name="note" placeholder="Опционально" class="t-input">
+            </div>
+
+            <div style="flex: 1; min-width: 150px;">
+                <button type="submit" class="btn btn-primary"
+                    style="width: 100%; height: 42px; display: flex; align-items: center; justify-content: center;">Добавить</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<style>
+    .schedule-day:hover {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .schedule-day {
+        transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+
+    .time-grid-item {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: 0%;
+    }
+
+    .time-grid-item:hover {
+        z-index: 50 !important;
+        width: 100% !important;
+        left: 0 !important;
+        min-height: var(--base-height) !important;
+        height: max-content !important;
+        transform: scale(1.02) translateY(-2px);
+    }
+
+    .time-grid-item .neon-glow {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.3s ease;
+    }
+
+    .time-grid-item:hover .neon-glow {
+        white-space: normal;
+        word-break: break-word;
+        box-shadow: 0 5px 20px rgba(var(--accent-rgb), 0.5);
+        border-color: rgba(var(--accent-rgb), 0.8);
+    }
+
+    @keyframes fadeInSlide {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .time-grid-container {
+        animation: fadeInSlide 0.4s ease;
+    }
+
+    @keyframes modalPop {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    #modal-session-details .modal-content {
+        animation: modalPop 0.3s ease;
+    }
+</style>
+
+<!-- Модальное окно деталей занятия -->
+<div class="modal-overlay" id="modal-session-details">
+    <div class="modal-content" style="max-width: 400px;">
+        <button class="modal-close" onclick="closeModal('modal-session-details')">&times;</button>
+        <h2 id="modal-session-title" style="margin-bottom: 1rem; padding-right: 1.5rem; color: var(--accent); word-break: break-word;">Название</h2>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1.5rem;">
+            <div><span class="muted">Время:</span> <strong id="modal-session-time"></strong></div>
+            <div id="modal-session-client-container"><span class="muted">Клиент:</span> <strong id="modal-session-client"></strong></div>
+            <div><span class="muted">Тренер:</span> <strong id="modal-session-trainer"></strong></div>
+            <div id="modal-session-note-container"><span class="muted">Заметка:</span> <span id="modal-session-note"></span></div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+            <button onclick="closeModal('modal-session-details')" class="btn btn-ghost" style="flex: 1;">Закрыть</button>
+            <form method="post" action="/schedule" style="margin: 0; flex: 1; display: flex;">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="session_id" id="modal-session-id" value="">
+                <input type="hidden" name="week_offset" value="{{ week_offset }}">
+                <input type="hidden" name="selected_trainer" value="{{ selected_trainer }}">
+                <button type="submit" class="btn" style="background: transparent; color: #ff4d4d; border: 1px solid rgba(255,77,77,0.3); width: 100%;" onclick="return confirm('Удалить занятие?')">Удалить</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openSessionModal(element) {
+    const id = element.getAttribute('data-id');
+    const title = element.getAttribute('data-title');
+    const time = element.getAttribute('data-time');
+    const client = element.getAttribute('data-client');
+    const trainer = element.getAttribute('data-trainer');
+    const note = element.getAttribute('data-note');
+
+    document.getElementById('modal-session-id').value = id;
+    document.getElementById('modal-session-title').textContent = title;
+    document.getElementById('modal-session-time').textContent = time;
+    document.getElementById('modal-session-trainer').textContent = trainer;
+    
+    if (client) {
+        document.getElementById('modal-session-client').textContent = client;
+        document.getElementById('modal-session-client-container').style.display = 'block';
+    } else {
+        document.getElementById('modal-session-client-container').style.display = 'none';
+    }
+
+    if (note) {
+        document.getElementById('modal-session-note').textContent = note;
+        document.getElementById('modal-session-note-container').style.display = 'block';
+    } else {
+        document.getElementById('modal-session-note-container').style.display = 'none';
+    }
+
+    openModal('modal-session-details');
+}
+
+// Форма добавления занятия - клиентская валидация и тряска
+document.getElementById('add-session-form').addEventListener('submit', function(e) {
+    let isValid = true;
+    
+    const titleInput = this.querySelector('[name="title"]');
+    const clientSelect = this.querySelector('[name="client_id"]');
+    const dateInput = this.querySelector('[name="date"]');
+    const timeInput = this.querySelector('[name="time"]');
+    const trainerSelect = this.querySelector('[name="trainer_id"]');
+    const durationInput = this.querySelector('[name="duration_minutes"]');
+
+    function showError(input, msgText) {
+        const wrap = input.closest('.form-group');
+        wrap.classList.add('is-error');
+        input.classList.remove('is-shaking');
+        void input.offsetWidth; // force reflow
+        input.classList.add('is-error', 'is-shaking');
+        
+        let msg = wrap.querySelector('.t-error-msg');
+        if (!msg) {
+            msg = document.createElement('p');
+            msg.className = 't-error-msg';
+            wrap.appendChild(msg);
+        }
+        msg.textContent = msgText;
+        
+        input.addEventListener('input', function() {
+            clearError(this);
+        }, { once: true });
+    }
+    
+    function clearError(input) {
+        const wrap = input.closest('.form-group');
+        wrap.classList.remove('is-error');
+        input.classList.remove('is-error', 'is-shaking');
+    }
+
+    // Проверяем название или клиента
+    if (!titleInput.value.trim() && !clientSelect.value) {
+        isValid = false;
+        showError(titleInput, "Укажите название или клиента");
+    } else {
+        clearError(titleInput);
+    }
+
+    if (!dateInput.value) {
+        isValid = false;
+        showError(dateInput, "Укажите дату");
+    } else {
+        clearError(dateInput);
+    }
+
+    if (!timeInput.value) {
+        isValid = false;
+        showError(timeInput, "Укажите время");
+    } else {
+        clearError(timeInput);
+    }
+
+    if (!trainerSelect.value) {
+        isValid = false;
+        showError(trainerSelect, "Выберите тренера");
+    } else {
+        clearError(trainerSelect);
+    }
+
+    if (!durationInput.value || parseInt(durationInput.value) <= 0) {
+        isValid = false;
+        showError(durationInput, "Укажите длительность");
+    } else {
+        clearError(durationInput);
+    }
+
+    if (!isValid) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+# Виртуальное окружение — на Render ставится заново из requirements.txt
+.venv/
+venv/
+env/
+
+# Секреты и локальные настройки
+.env
+.env.local
+
+# Базы и кэш (на сервере будет своя PostgreSQL)
+*.db
+*.sqlite3
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# macOS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Логи
+*.log

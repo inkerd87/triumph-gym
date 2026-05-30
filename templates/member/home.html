@@ -1,0 +1,184 @@
+{% extends "member/base.html" %}
+{% block title %}Триумф — главная{% endblock %}
+
+{% block shell %}
+<div class="member-shell">
+    {% include 'member/_decor.html' %}
+
+    <header class="member-header member-header--float">
+        <div class="member-brand member-brand--text">
+            <div class="member-brand-mark">Т</div>
+            <span>Триумф</span>
+        </div>
+        <div class="clock-widget clock-widget--compact member-header-clock">
+            <div class="clock-widget-accent" aria-hidden="true"></div>
+            <div class="clock-widget-body">
+                <time class="header-clock" id="memberLiveClock">
+                    <span class="clock-hm">--:--</span><span class="clock-sec">00</span>
+                </time>
+            </div>
+        </div>
+    </header>
+
+    <main class="member-main member-stagger">
+        {% with messages = get_flashed_messages() %}
+            {% for message in messages %}<p class="member-flash">{{ message }}</p>{% endfor %}
+        {% endwith %}
+
+        <section class="member-hero member-hero--slash">
+            <div class="member-hero-slash" aria-hidden="true"></div>
+            <p class="member-hero-label">Сегодня в игре</p>
+            <h1 class="member-hero-title member-text-shine">{{ client.full_name.split()[0] if client.full_name else 'Участник' }}</h1>
+            <span class="member-badge {% if client.category == 'vip' %}member-badge--vip{% endif %}">
+                {{ category_label(client.category) }}
+            </span>
+        </section>
+
+        <div class="member-quick-scroll">
+            <a href="{{ url_for('member.equipment') }}" class="member-quick-tile member-quick-tile--hot member-glow-border">
+                <span class="member-quick-tile-icon member-quick-tile-icon--gym" aria-hidden="true"></span>
+                <span class="member-quick-tile-label">Тренажёры</span>
+            </a>
+            <a href="{{ url_for('member.schedule') }}" class="member-quick-tile member-glow-border">
+                <span class="member-quick-tile-icon member-quick-tile-icon--cal" aria-hidden="true"></span>
+                <span class="member-quick-tile-label">Расписание</span>
+            </a>
+            <a href="{{ url_for('member.profile') }}" class="member-quick-tile member-glow-border">
+                <span class="member-quick-tile-icon member-quick-tile-icon--user" aria-hidden="true"></span>
+                <span class="member-quick-tile-label">Профиль</span>
+            </a>
+        </div>
+
+        <section class="member-gym-live member-gym-live--split member-glass" id="gymLiveCard">
+            <div class="member-gym-live-ring" aria-hidden="true"></div>
+            <div class="member-gym-live-left">
+                <p class="member-gym-live-label"><span class="live-dot"></span> Live</p>
+                <p class="member-gym-live-sub">в зале сейчас</p>
+                {% if is_in_gym %}
+                <p class="member-gym-status member-gym-status--in">Вы с {{ open_visit.check_in_at.strftime('%H:%M') if open_visit and open_visit.check_in_at else '—' }}</p>
+                {% else %}
+                <p class="member-gym-status muted">Отметьте вход</p>
+                {% endif %}
+            </div>
+            <p class="member-gym-live-count" id="memberInGymCount">{{ in_gym_count }}</p>
+            <div class="member-gym-live-action">
+                {% if is_in_gym %}
+                <button type="button" class="member-btn member-btn--shine member-btn--compact member-btn--ghost" id="memberCheckoutBtn">Выйти</button>
+                {% else %}
+                <button type="button" class="member-btn member-btn--shine member-btn--compact" id="memberCheckinBtn">Я в зале</button>
+                {% endif %}
+            </div>
+            <p class="member-gym-toast" id="memberGymToast" hidden></p>
+        </section>
+
+        <article class="member-club-card {% if client.category == 'vip' %}member-club-card--vip{% endif %}">
+            <div class="member-club-card-bg" aria-hidden="true"></div>
+            <div class="member-club-card-shine" aria-hidden="true"></div>
+            <div class="member-club-card-chip" aria-hidden="true"></div>
+            <header class="member-club-card-head">
+                <span class="member-club-card-brand">ТРИУМФ</span>
+                <span class="member-badge {% if client.category == 'vip' %}member-badge--vip{% endif %}">{{ category_label(client.category) }}</span>
+            </header>
+            <p class="member-club-card-number">№ {{ '%04d'|format(client.id) }}</p>
+            <p class="member-club-card-name">{{ client.full_name }}</p>
+            {% if membership %}
+            <p class="member-club-card-plan">{{ membership.membership.name }}</p>
+            <div class="member-progress member-progress--card">
+                <div class="member-progress-bar">
+                    <div class="member-progress-fill member-progress-fill--shine" style="width: {{ progress }}%;"></div>
+                </div>
+                <div class="member-progress-meta">
+                    <span>{{ days_left }} дн.</span>
+                    <span>{{ membership.end_date.strftime('%d.%m.%Y') }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="member-club-card-empty">Нет активного абонемента</p>
+            {% endif %}
+        </article>
+
+        <div class="member-stats member-stats--bento">
+            <div class="member-stat member-stat--orb">
+                <span class="member-stat-orb" aria-hidden="true"></span>
+                <b>{{ visits_month }}</b>
+                <span>визитов в месяце</span>
+            </div>
+            <div class="member-stat member-stat--wide member-stat--orb member-stat--accent">
+                <span class="member-stat-orb" aria-hidden="true"></span>
+                <b>{{ days_left if membership else '—' }}</b>
+                <span>дней абонемента</span>
+            </div>
+        </div>
+
+        {% if upcoming %}
+        <section class="member-card member-glass member-section-title">
+            <h2>Ближайшие занятия</h2>
+            {% for s in upcoming %}
+            <div class="member-session member-session--timeline">
+                <span class="member-session-pill">{{ s.start_time.strftime('%H:%M') }}</span>
+                <div class="member-session-body">
+                    <strong>{{ s.title }}</strong>
+                    <span class="muted">{{ s.start_time.strftime('%d.%m') }}{% if s.trainer %} · {{ s.trainer.full_name }}{% endif %}</span>
+                </div>
+            </div>
+            {% endfor %}
+            <a href="{{ url_for('member.schedule') }}" class="member-link-arrow">Всё расписание →</a>
+        </section>
+        {% endif %}
+    </main>
+
+    {% include 'member/_nav.html' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const countEl = document.getElementById('memberInGymCount');
+    const toastEl = document.getElementById('memberGymToast');
+    const checkinBtn = document.getElementById('memberCheckinBtn');
+    const checkoutBtn = document.getElementById('memberCheckoutBtn');
+
+    function showToast(msg, isError) {
+        if (!toastEl) return;
+        toastEl.hidden = false;
+        toastEl.textContent = msg;
+        toastEl.className = 'member-gym-toast' + (isError ? ' member-gym-toast--error' : '');
+        setTimeout(() => { toastEl.hidden = true; }, 3500);
+    }
+
+    function setCount(n) {
+        if (countEl) {
+            countEl.classList.add('is-pulse');
+            countEl.textContent = n;
+            setTimeout(() => countEl.classList.remove('is-pulse'), 400);
+        }
+    }
+
+    async function refreshStatus() {
+        try {
+            const r = await fetch('{{ url_for("member.gym_status") }}');
+            const data = await r.json();
+            if (data.in_gym_count != null) setCount(data.in_gym_count);
+        } catch (_) {}
+    }
+
+    async function gymAction(url) {
+        const r = await fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
+        const data = await r.json();
+        if (!data.ok) {
+            showToast(data.message || 'Ошибка', true);
+            return;
+        }
+        showToast(data.message, false);
+        if (data.in_gym_count != null) setCount(data.in_gym_count);
+        setTimeout(() => location.reload(), 800);
+    }
+
+    checkinBtn?.addEventListener('click', () => gymAction('{{ url_for("member.checkin") }}'));
+    checkoutBtn?.addEventListener('click', () => gymAction('{{ url_for("member.checkout") }}'));
+
+    setInterval(refreshStatus, 15000);
+})();
+</script>
+{% endblock %}

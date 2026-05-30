@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+    <div class="card-header">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <h2 style="margin: 0;">Участники «Триумф»</h2>
+            <span class="muted" style="font-size: 1.1rem; padding-top: 0.1rem;">Найдено: {{ total_clients }}</span>
+        </div>
+        <form method="get" action="/clients" class="search-form" data-ajax="false">
+            <input name="q" placeholder="Поиск (Имя, Телефон, Email)" value="{{ search_query }}">
+            <input type="hidden" name="category" value="{{ selected_category }}">
+            <select name="membership_status">
+                <option value="all" {% if membership_status == 'all' %}selected{% endif %}>Все абонементы</option>
+                <option value="active" {% if membership_status == 'active' %}selected{% endif %}>Активные</option>
+                <option value="expired" {% if membership_status == 'expired' %}selected{% endif %}>Закончились</option>
+                <option value="none" {% if membership_status == 'none' %}selected{% endif %}>Без абонемента</option>
+            </select>
+            <button type="submit" class="btn">Найти</button>
+        </form>
+    </div>
+    
+    <div class="tags">
+        <a class="tag {% if selected_category == 'all' %}active{% endif %}" href="/clients?category=all&membership_status={{ membership_status }}&q={{ search_query }}">Все</a>
+        <a class="tag {% if selected_category == 'client' %}active{% endif %}" href="/clients?category=client&membership_status={{ membership_status }}&q={{ search_query }}">Стандарт</a>
+        <a class="tag {% if selected_category == 'vip' %}active{% endif %}" href="/clients?category=vip&membership_status={{ membership_status }}&q={{ search_query }}">VIP</a>
+        <a class="tag {% if selected_category == 'trainer' %}active{% endif %}" href="/clients?category=trainer&membership_status={{ membership_status }}&q={{ search_query }}">Тренеры</a>
+    </div>
+
+    <div class="person-grid mt-2">
+        {% for c in clients %}
+            <article class="person-card {{ c.category }}">
+                <div class="person-head">
+                    <h3><a href="/clients/{{ c.id }}" style="color: inherit; text-decoration: none;">{{ c.full_name }}</a></h3>
+                    <span class="badge">{{ category_label(c.category) }}</span>
+                </div>
+                <p class="muted">{{ c.phone }}</p>
+                <p class="muted">{{ c.email if c.email else 'Почта не указана' }}</p>
+                
+                <div style="margin-top: 1.5rem;">
+                    <a href="/clients/{{ c.id }}" class="btn btn-ghost btn-small" style="width: 100%; display: block; text-align: center; text-decoration: none;">Открыть профиль</a>
+                </div>
+            </article>
+        {% else %}
+            <div class="empty-placeholder" style="grid-column: 1 / -1; margin-top: 2rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="placeholder-svg">
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <rect x="6" y="5" width="2" height="14" rx="1" />
+                    <rect x="9" y="7" width="2" height="10" rx="1" />
+                    <rect x="13" y="7" width="2" height="10" rx="1" />
+                    <rect x="16" y="5" width="2" height="14" rx="1" />
+                    <circle cx="5" cy="12" r="1" fill="var(--accent)" />
+                    <circle cx="19" cy="12" r="1" fill="var(--accent)" />
+                </svg>
+                <h3>Пока нет участников</h3>
+                <p class="muted">Клиенты не найдены.</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="pagination mt-2" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 2rem;">
+        {% for p in range(1, total_pages + 1) %}
+            <a href="/clients?page={{ p }}&category={{ selected_category }}&membership_status={{ membership_status }}&q={{ search_query }}" class="btn {% if p == current_page %}btn-ghost{% endif %}" style="padding: 0.5rem 1rem;">{{ p }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

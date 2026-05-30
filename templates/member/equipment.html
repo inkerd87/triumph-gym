@@ -1,0 +1,154 @@
+{% extends "member/base.html" %}
+{% block title %}Триумф — тренажёры{% endblock %}
+{% block body_class %}member-app--equipment{% endblock %}
+
+{% block shell %}
+<div class="member-shell">
+    {% include 'member/_decor.html' %}
+
+    <header class="member-header member-header--float member-header--minimal">
+        <a href="{{ url_for('member.home') }}" class="member-back" aria-label="Назад">←</a>
+        <span class="member-header-title">Карта зала</span>
+    </header>
+
+    <main class="member-main member-main--flush member-stagger">
+        <section class="member-page-hero member-page-hero--equipment">
+            <p class="member-hero-label">Интерактив</p>
+            <h1 class="member-text-shine">Тренажёры</h1>
+            <p>Тап — и видно, какие мышцы работают</p>
+        </section>
+
+        {% if equipment %}
+        {% set feat = equipment[0] %}
+        <button type="button" class="member-featured-eq member-glow-border"
+            data-muscles="{{ feat.muscles|join(',') }}"
+            data-name="{{ feat.name }}"
+            data-labels="{{ feat.muscle_labels|join('|') }}">
+            <span class="member-featured-eq-tag">Популярное</span>
+            <span class="member-featured-eq-name">{{ feat.name }}</span>
+            <span class="member-featured-eq-muscles">{{ feat.muscle_labels|join(' · ') }}</span>
+            <span class="member-featured-eq-cta">Смотреть мышцы →</span>
+        </button>
+        {% endif %}
+
+        <div class="member-filter-scroll" role="tablist">
+            {% for zone_id, zone_label in equipment_zones.items() %}
+            <button type="button" class="member-chip member-chip--{{ zone_id }} {% if zone_id == 'all' %}is-active{% endif %}"
+                data-filter="{{ zone_id }}" role="tab">{{ zone_label }}</button>
+            {% endfor %}
+        </div>
+
+        <div class="member-equipment-list" role="list">
+            {% for eq in equipment %}
+            <button
+                type="button"
+                class="member-equipment-row member-glass member-equipment-row--{{ eq.zone }}"
+                role="listitem"
+                data-zone="{{ eq.zone }}"
+                data-muscles="{{ eq.muscles|join(',') }}"
+                data-name="{{ eq.name }}"
+                data-labels="{{ eq.muscle_labels|join('|') }}"
+            >
+                <span class="member-equipment-icon member-equipment-icon--{{ eq.icon }}" aria-hidden="true"></span>
+                <span class="member-equipment-row-body">
+                    <span class="member-equipment-name">{{ eq.name }}</span>
+                    <span class="member-equipment-muscles">{{ eq.muscle_labels|join(' · ') }}</span>
+                </span>
+                <span class="member-zone-pill member-zone-pill--{{ eq.zone }}">{{ equipment_zones[eq.zone] }}</span>
+            </button>
+            {% endfor %}
+        </div>
+        <p class="member-filter-empty" id="equipmentEmpty" hidden>В этой категории пока пусто</p>
+    </main>
+
+    <div class="member-muscle-modal" id="muscleModal" hidden aria-hidden="true">
+        <div class="member-muscle-modal-backdrop" data-close-modal></div>
+        <div class="member-muscle-sheet member-muscle-sheet--premium" role="dialog" aria-modal="true" aria-labelledby="muscleModalTitle">
+            <div class="member-sheet-handle" aria-hidden="true"></div>
+            <button type="button" class="member-muscle-modal-close" data-close-modal aria-label="Закрыть">×</button>
+            <p class="member-sheet-label">Мышечные группы</p>
+            <h2 id="muscleModalTitle" class="member-text-shine">Тренажёр</h2>
+            <ul class="member-muscle-tags member-muscle-tags--lg" id="muscleModalTags"></ul>
+            <div class="member-body-diagram-wrap member-body-diagram-wrap--neon">
+                {% include 'member/_body_muscles.svg.html' %}
+            </div>
+        </div>
+    </div>
+
+    {% include 'member/_nav.html' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const modal = document.getElementById('muscleModal');
+    const titleEl = document.getElementById('muscleModalTitle');
+    const tagsEl = document.getElementById('muscleModalTags');
+    const svg = document.getElementById('bodyMuscleSvg');
+    const emptyEl = document.getElementById('equipmentEmpty');
+    if (!modal || !svg) return;
+
+    const muscleGroups = svg.querySelectorAll('g.muscle-group[data-muscle]');
+    const rows = document.querySelectorAll('.member-equipment-row, .member-featured-eq');
+    const chips = document.querySelectorAll('.member-chip[data-filter]');
+
+    function setActiveMuscles(ids) {
+        svg.classList.toggle('body-has-focus', ids.length > 0);
+        muscleGroups.forEach(g => {
+            g.classList.toggle('muscle-active', ids.includes(g.getAttribute('data-muscle')));
+        });
+    }
+
+    function openModal(name, muscles, labels) {
+        titleEl.textContent = name;
+        setActiveMuscles(muscles);
+        tagsEl.innerHTML = '';
+        labels.forEach(label => {
+            const li = document.createElement('li');
+            li.textContent = label;
+            tagsEl.appendChild(li);
+        });
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('member-modal-open');
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('member-modal-open');
+        setActiveMuscles([]);
+    }
+
+    function bindOpen(el) {
+        el.addEventListener('click', () => {
+            const muscles = (el.dataset.muscles || '').split(',').filter(Boolean);
+            const labels = (el.dataset.labels || '').split('|').filter(Boolean);
+            openModal(el.dataset.name || 'Тренажёр', muscles, labels);
+        });
+    }
+
+    function applyFilter(zone) {
+        let visible = 0;
+        document.querySelectorAll('.member-equipment-row').forEach(row => {
+            const show = zone === 'all' || row.dataset.zone === zone;
+            row.hidden = !show;
+            if (show) visible++;
+        });
+        if (emptyEl) emptyEl.hidden = visible > 0;
+    }
+
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            chips.forEach(c => c.classList.toggle('is-active', c === chip));
+            applyFilter(chip.dataset.filter);
+        });
+    });
+
+    rows.forEach(bindOpen);
+    modal.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+})();
+</script>
+{% endblock %}

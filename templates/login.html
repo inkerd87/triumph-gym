@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Триумф — вход</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="login-body">
+    <div class="login-bg" aria-hidden="true"></div>
+    <div class="login-card">
+        <div class="brand-mark login-brand-mark" aria-hidden="true">Т</div>
+        <h1>Триумф</h1>
+        <p class="muted">Сила. Дисциплина. Результат.</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash flash-error">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="post" action="/login" class="form">
+            <input name="username" placeholder="Логин" required autocomplete="username">
+            <input name="password" type="password" placeholder="Пароль" required autocomplete="current-password">
+            <button type="submit" class="btn">Войти в зал</button>
+        </form>
+        <p class="muted small">По умолчанию: admin / admin123</p>
+    </div>
+</body>
+</html>

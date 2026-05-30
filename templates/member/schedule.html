@@ -1,0 +1,77 @@
+{% extends "member/base.html" %}
+{% block title %}Триумф — расписание{% endblock %}
+
+{% block shell %}
+<div class="member-shell">
+    {% include 'member/_decor.html' %}
+    <header class="member-header member-header--float member-header--minimal">
+        <a href="{{ url_for('member.home') }}" class="member-back" aria-label="Назад">←</a>
+        <span class="member-header-title">Расписание</span>
+    </header>
+
+    <main class="member-main member-stagger">
+        <section class="member-page-hero">
+            <p class="member-hero-label">Расписание</p>
+            <h1 class="member-text-shine">Неделя</h1>
+            <p>{{ target_monday.strftime('%d.%m') }} — {{ target_sunday.strftime('%d.%m.%Y') }}</p>
+        </section>
+        <div class="member-week-nav">
+            <a href="{{ url_for('member.schedule', week_offset=week_offset - 1) }}">← Неделя</a>
+            {% if week_offset != 0 %}
+            <a href="{{ url_for('member.schedule', week_offset=0) }}">Сейчас</a>
+            {% endif %}
+            <a href="{{ url_for('member.schedule', week_offset=week_offset + 1) }}">Неделя →</a>
+        </div>
+
+        <div class="member-day-tabs" role="tablist">
+            {% for day in days %}
+            <button type="button" class="member-day-tab {% if day.is_today %}is-today{% endif %} {% if loop.index0 == 0 %}active{% endif %}"
+                data-day="{{ loop.index0 }}" aria-selected="{% if loop.index0 == 0 %}true{% else %}false{% endif %}">
+                {{ day.label }}
+                <small>{{ day.date.strftime('%d.%m') }}</small>
+            </button>
+            {% endfor %}
+        </div>
+
+        {% for day in days %}
+        <section class="member-card member-glass member-day-panel" data-day-panel="{{ loop.index0 }}" style="{% if loop.index0 != 0 %}display:none{% endif %}">
+            <h2>{% if day.is_today %}Сегодня{% else %}{{ day.label }}, {{ day.date.strftime('%d.%m') }}{% endif %}</h2>
+            {% if day.sessions %}
+                {% for s in day.sessions %}
+                <div class="member-session member-session--timeline">
+                    <span class="member-session-pill">{{ s.start_time.strftime('%H:%M') }}</span>
+                    <div class="member-session-body">
+                        <strong>{{ s.title }}</strong>
+                        <span class="muted">{{ s.duration_minutes }} мин{% if s.trainer %} · {{ s.trainer.full_name }}{% endif %}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="member-empty">Занятий нет</p>
+            {% endif %}
+        </section>
+        {% endfor %}
+    </main>
+
+    {% include 'member/_nav.html' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('.member-day-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const idx = tab.dataset.day;
+            document.querySelectorAll('.member-day-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.day === idx);
+                t.setAttribute('aria-selected', t.dataset.day === idx ? 'true' : 'false');
+            });
+            document.querySelectorAll('.member-day-panel').forEach(p => {
+                p.style.display = p.dataset.dayPanel === idx ? 'block' : 'none';
+            });
+        });
+    });
+    const todayTab = document.querySelector('.member-day-tab.is-today');
+    if (todayTab) todayTab.click();
+</script>
+{% endblock %}

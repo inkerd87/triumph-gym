@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>{% block title %}Триумф{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Unbounded:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='member.css') }}">
+</head>
+<body class="member-app {% block body_class %}{% endblock %}">
+    <div class="member-ambient" aria-hidden="true">
+        <span class="member-blob member-blob--a"></span>
+        <span class="member-blob member-blob--b"></span>
+        <span class="member-blob member-blob--c"></span>
+        <div class="member-noise"></div>
+    </div>
+    {% block shell %}{% endblock %}
+    <script>
+        function updateMemberClock() {
+            const el = document.getElementById('memberLiveClock');
+            if (!el) return;
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            const hm = el.querySelector('.clock-hm');
+            const sec = el.querySelector('.clock-sec');
+            if (hm) hm.textContent = `${h}:${m}`;
+            if (sec) sec.textContent = s;
+        }
+        updateMemberClock();
+        setInterval(updateMemberClock, 1000);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

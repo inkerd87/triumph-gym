@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero-banner">
+    <div class="hero-text">
+        <p class="hero-greeting">{{ greeting }}, {{ session.get('admin_username', 'оператор') }}</p>
+        <h2 class="hero-title">Сегодня в зале</h2>
+        <p class="muted hero-date">{{ today_str }}</p>
+        <div class="hero-metrics">
+            <div class="hero-metric hero-metric-live">
+                <span class="hero-metric-value counter hall-pulse" id="inGymCounter" data-target="{{ in_gym_count }}">0</span>
+                <span class="hero-metric-label"><span class="live-dot" aria-hidden="true"></span> сейчас в зале</span>
+            </div>
+            <div class="hero-metric">
+                <span class="hero-metric-value counter hall-pulse" id="hallVisitsCounter" data-target="{{ visits_today }}">0</span>
+                <span class="hero-metric-label">визитов сегодня</span>
+                {% if visits_trend_pct > 0 %}
+                    <span class="trend trend-up">+{{ visits_trend_pct }}% к вчера</span>
+                {% elif visits_trend_pct < 0 %}
+                    <span class="trend trend-down">{{ visits_trend_pct }}% к вчера</span>
+                {% else %}
+                    <span class="trend trend-flat">как вчера</span>
+                {% endif %}
+            </div>
+            <div class="hero-metric hero-metric-alt">
+                <span class="hero-metric-value counter" id="hallUniqueCounter" data-target="{{ unique_visitors_today }}">0</span>
+                <span class="hero-metric-label">уникальных гостей</span>
+                <span class="muted" style="font-size:0.7rem;">{{ sessions_today }} занятий · <a href="/schedule" class="hero-link">расписание</a></span>
+            </div>
+        </div>
+    </div>
+    <div class="hero-checkin card neon-glow">
+        <h3>Быстрый вход</h3>
+        <form method="post" action="/attendance" class="form hero-checkin-form js-checkin-form" novalidate>
+            <input type="text" name="client_search" class="t-input" list="clients-datalist" placeholder="Найти по имени..." autocomplete="off" id="clientSearch">
+            <datalist id="clients-datalist">
+                {% for c in clients %}
+                <option value="{{ c.full_name }}" data-id="{{ c.id }}"></option>
+                {% endfor %}
+            </datalist>
+            <input type="hidden" name="client_id" id="checkinClientId">
+            <select class="t-input checkin-select-fallback" id="checkinSelectFallback">
+                <option value="">Или выберите из списка</option>
+                {% for c in clients %}
+                    <option value="{{ c.id }}">{{ c.full_name }}</option>
+                {% endfor %}
+            </select>
+            <div class="hero-checkin-row">
+                <input type="date" name="visit_date" value="{{ today_iso }}" required class="t-input">
+                <button type="submit" class="btn">Вход</button>
+            </div>
+        </form>
+        <form method="post" action="/attendance/checkout" class="form hero-checkin-form js-checkout-form" style="margin-top: 0.75rem;" novalidate>
+            <input type="hidden" name="client_id" class="checkout-client-id">
+            <button type="submit" class="btn btn-ghost" style="width: 100%;">Выход из зала</button>
+        </form>
+    </div>
+</section>
+
+<div class="quick-actions">
+    <button type="button" onclick="openModal('modal-add-client')" class="btn">+ Участник</button>
+    <button type="button" onclick="openModal('modal-assign-membership')" class="btn btn-ghost">+ Абонемент</button>
+    <a href="/schedule" class="btn btn-ghost">Расписание</a>
+    <a href="/clients" class="btn btn-ghost">Все клиенты</a>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="modal-add-client">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('modal-add-client')">&times;</button>
+        <h2 style="margin-bottom: 1.5rem;">Регистрация клиента</h2>
+        <form method="post" action="/clients" class="form" novalidate>
+            <div class="form-group" style="position: relative;">
+                <input name="full_name" placeholder="ФИО" required pattern="^[A-Za-zА-Яа-яЁё\s]+$" minlength="2" title="Только буквы и пробелы, минимум 2 символа" class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input name="phone" placeholder="Телефон" required pattern="^\+?[0-9\s\-\(\)]+$" title="Допустимы цифры, пробелы, плюс, скобки и дефис" class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input type="email" name="email" placeholder="Email (опционально)" class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <select name="category" required class="t-input">
+                    <option value="client">Стандарт</option>
+                    <option value="vip">VIP статус</option>
+                    <option value="trainer">Тренер-клиент</option>
+                </select>
+            </div>
+            <button type="submit" class="btn" style="margin-top: 1rem;">Зарегистрировать</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-assign-membership">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('modal-assign-membership')">&times;</button>
+        <h2 style="margin-bottom: 1.5rem;">Выдать абонемент</h2>
+        <form method="post" action="/assign-membership" class="form" novalidate>
+            <div class="form-group" style="position: relative;">
+                <select name="client_id" required class="t-input">
+                    <option value="">Выберите клиента</option>
+                    {% for c in clients %}
+                        <option value="{{ c.id }}">{{ c.full_name }} ({{ category_label(c.category) }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <select name="membership_id" required class="t-input">
+                    <option value="">Тариф</option>
+                    {% for m in memberships %}
+                        <option value="{{ m.id }}">{{ m.name }} ({{ m.duration_days }} дн.)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input type="date" name="start_date" required class="t-input">
+            </div>
+            <button type="submit" class="btn" style="margin-top: 1rem;">Активировать</button>
+        </form>
+    </div>
+</div>
+
+<section class="stats">
+    <a href="/clients" class="stat">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <b class="counter" data-target="{{ stats.clients_count }}">0</b><span>Участников</span>
+    </a>
+    <a href="/clients?category=vip" class="stat stat-vip">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <b class="counter" data-target="{{ stats.vip_clients_count }}">0</b><span>VIP</span>
+    </a>
+    <a href="#trainers-section" class="stat">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 6.5L12 3l5.5 3.5"/><path d="M12 14v4"/><path d="M8 18h8"/></svg>
+        <b class="counter" data-target="{{ stats.trainers_count }}">0</b><span>Тренеров</span>
+    </a>
+    <a href="/clients?membership_status=active" class="stat">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        <b class="counter" data-target="{{ stats.active_memberships_count }}">0</b><span>Активных тарифов</span>
+    </a>
+</section>
+
+<div class="dashboard-split">
+    <section class="card chart-card">
+        <h2>Посещаемость · 7 дней</h2>
+        <div class="chart-wrap">
+            <canvas id="attendanceChart"></canvas>
+        </div>
+    </section>
+
+    <section class="card activity-card">
+        <h2>Лента визитов</h2>
+        <ul class="activity-feed" id="activityFeed">
+            {% for v in recent_visits %}
+            <li class="activity-item">
+                <span class="activity-dot"></span>
+                <div class="activity-body">
+                    <strong>{{ v.client.full_name if v.client else '—' }}</strong>
+                    <span class="muted">{{ v.visit_date.strftime('%d.%m.%Y') if v.visit_date else '' }}{% if v.trainer %} · {{ v.trainer.full_name }}{% endif %}</span>
+                </div>
+            </li>
+            {% else %}
+            <li class="activity-empty muted">Пока нет визитов — отметьте первый вход</li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
+
+<div class="widgets-row">
+    <section class="card widget-card">
+        <h2>Звёзды недели</h2>
+        <ol class="leaderboard">
+            {% for item in top_visitors %}
+            <li>
+                <span class="lb-rank">{{ loop.index }}</span>
+                <span class="lb-name">{{ item.name }}</span>
+                <span class="lb-count">{{ item.count }} виз.</span>
+            </li>
+            {% else %}
+            <li class="muted">Пока мало данных за неделю</li>
+            {% endfor %}
+        </ol>
+    </section>
+    <section class="card widget-card">
+        <h2>Скоро истекает</h2>
+        <ul class="expiring-list">
+            {% for cm in expiring_soon %}
+            <li>
+                <strong>{{ cm.client.full_name if cm.client else '—' }}</strong>
+                <span class="muted">{{ cm.membership.name if cm.membership else 'тариф' }} · до {{ cm.end_date.strftime('%d.%m') }}</span>
+            </li>
+            {% else %}
+            <li class="muted">На этой неделе всё в порядке</li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
+
+<script>
+    window.initDashboardPage = function() {
+        const search = document.getElementById('clientSearch');
+        const hiddenId = document.getElementById('checkinClientId');
+        const fallback = document.querySelector('.checkin-select-fallback');
+        const datalist = document.getElementById('clients-datalist');
+        if (search && hiddenId && datalist) {
+            const map = {};
+            datalist.querySelectorAll('option').forEach(opt => {
+                map[opt.value] = opt.dataset.id;
+            });
+            const syncFromSearch = () => {
+                const id = map[search.value.trim()];
+                if (id) {
+                    hiddenId.value = id;
+                    if (fallback) fallback.removeAttribute('required');
+                }
+            };
+            search.addEventListener('change', syncFromSearch);
+            search.addEventListener('input', syncFromSearch);
+        }
+        if (fallback && hiddenId) {
+            fallback.addEventListener('change', () => {
+                if (fallback.value) {
+                    hiddenId.value = fallback.value;
+                    if (search) search.value = fallback.options[fallback.selectedIndex].text;
+                }
+            });
+        }
+
+        const syncCheckoutClientId = () => {
+            const mainId = document.getElementById('checkinClientId');
+            const sel = document.getElementById('checkinSelectFallback');
+            let val = mainId?.value || '';
+            if (!val && sel?.value) val = sel.value;
+            document.querySelectorAll('.checkout-client-id').forEach(el => { el.value = val; });
+        };
+        document.getElementById('checkinClientId')?.addEventListener('change', syncCheckoutClientId);
+        document.getElementById('checkinSelectFallback')?.addEventListener('change', syncCheckoutClientId);
+        document.getElementById('clientSearch')?.addEventListener('change', syncCheckoutClientId);
+
+        const prepClientForm = (e, form) => {
+            const hid = form.querySelector('[name="client_id"]');
+            const sel = form.querySelector('.checkin-select-fallback') || document.getElementById('checkinSelectFallback');
+            if (sel && sel.value && hid && !hid.value) hid.value = sel.value;
+            if (!hid?.value && document.getElementById('checkinClientId')?.value) {
+                hid.value = document.getElementById('checkinClientId').value;
+            }
+            if (!hid?.value) {
+                e.preventDefault();
+                e.stopPropagation();
+                alert('Выберите участника из списка или найдите по имени.');
+            }
+        };
+
+        document.querySelectorAll('.js-checkin-form').forEach(form => {
+            form.addEventListener('submit', e => prepClientForm(e, form), true);
+        });
+        document.querySelectorAll('.js-checkout-form').forEach(form => {
+            form.addEventListener('submit', e => prepClientForm(e, form), true);
+        });
+
+        document.querySelectorAll('.counter').forEach(el => {
+            if (el.dataset.animated === '1') return;
+            el.dataset.animated = '1';
+            const target = parseInt(el.dataset.target || '0', 10);
+            const duration = 900;
+            const start = performance.now();
+            const tick = (now) => {
+                const p = Math.min((now - start) / duration, 1);
+                el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+                if (p < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        });
+
+        const ctx = document.getElementById('attendanceChart');
+        if (!ctx || ctx.dataset.chartReady === '1') return;
+        ctx.dataset.chartReady = '1';
+        const chartCtx = ctx.getContext('2d');
+        const labels = {{ chart_labels | tojson | safe }};
+        const data = {{ chart_data | tojson | safe }};
+        
+        Chart.defaults.font.family = "'Unbounded', sans-serif";
+        
+        new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Визиты',
+                    data: data,
+                    borderColor: '#e10600',
+                    backgroundColor: 'rgba(225, 6, 0, 0.15)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: '#e10600',
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                        ticks: { color: 'rgba(255, 255, 255, 0.5)' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                        ticks: { color: 'rgba(255, 255, 255, 0.5)', stepSize: 1 },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    };
+
+    window.animateCounterTo = function(el, target) {
+        const from = parseInt(el.textContent || '0', 10);
+        const duration = 500;
+        const start = performance.now();
+        el.classList.add('hall-pulse');
+        setTimeout(() => el.classList.remove('hall-pulse'), 600);
+        const tick = (now) => {
+            const p = Math.min((now - start) / duration, 1);
+            const val = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+            el.textContent = val;
+            el.dataset.target = target;
+            if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    };
+
+    window.handleCheckinSuccess = function(data) {
+        const visitsEl = document.getElementById('hallVisitsCounter');
+        const uniqueEl = document.getElementById('hallUniqueCounter');
+        const inGymEl = document.getElementById('inGymCounter');
+        if (visitsEl && data.visits_today != null) window.animateCounterTo(visitsEl, data.visits_today);
+        if (uniqueEl && data.unique_today != null) window.animateCounterTo(uniqueEl, data.unique_today);
+        if (inGymEl && data.in_gym_count != null) window.animateCounterTo(inGymEl, data.in_gym_count);
+
+        const feed = document.getElementById('activityFeed');
+        if (feed) {
+            const empty = feed.querySelector('.activity-empty');
+            if (empty) empty.remove();
+            const li = document.createElement('li');
+            li.className = 'activity-item activity-item-new';
+            li.innerHTML = `<span class="activity-dot"></span><div class="activity-body"><strong>${data.client_name}</strong><span class="muted">${data.visit_date} · только что</span></div>`;
+            feed.prepend(li);
+        }
+
+        document.querySelectorAll('.js-checkin-form').forEach(form => {
+            form.reset();
+            const hid = form.querySelector('[name="client_id"]');
+            if (hid) hid.value = '';
+        });
+    };
+
+    initDashboardPage();
+</script>
+
+<!-- Bento Grid for secondary entities -->
+<div class="bento-grid" style="margin-top: 1.5rem;">
+    <!-- Register Visit -->
+    <section class="card">
+        <div class="card-header">
+            <h2>Регистрация визита</h2>
+        </div>
+        <form method="post" action="/attendance" class="form mb-2 js-checkin-form" novalidate>
+            <div class="form-group" style="position: relative;">
+                <select name="client_id" required class="t-input">
+                    <option value="">Клиент на входе</option>
+                    {% for c in clients %}
+                        <option value="{{ c.id }}">{{ c.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <select name="trainer_id" class="t-input">
+                    <option value="">Без персонального тренера</option>
+                    {% for t in trainers %}
+                        <option value="{{ t.id }}">{{ t.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input type="date" name="visit_date" required class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input name="note" placeholder="Заметка (опц.)" class="t-input">
+            </div>
+            <button type="submit" class="btn">Отметить вход</button>
+        </form>
+    </section>
+
+    <!-- Trainers -->
+    <section class="card" id="trainers-section">
+        <div class="card-header">
+            <h2>Штат Тренеров</h2>
+        </div>
+        <form method="post" action="/trainers" class="form mb-2" novalidate>
+            <div class="form-group" style="position: relative;">
+                <input name="full_name" placeholder="ФИО" required class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input name="specialization" placeholder="Профиль (напр. Кроссфит)" required class="t-input">
+            </div>
+            <button type="submit" class="btn btn-ghost">Добавить в штат</button>
+        </form>
+        <div class="table-responsive">
+            <table>
+                <tr><th>Имя</th><th>Профиль</th></tr>
+                {% for t in trainers %}
+                    <tr>
+                        <td>{{ t.full_name }}</td>
+                        <td>{{ t.specialization }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </section>
+
+    <!-- Memberships -->
+    <section class="card" id="memberships-section">
+        <div class="card-header">
+            <h2>Тарифы</h2>
+        </div>
+        <form method="post" action="/memberships" class="form mb-2" novalidate>
+            <div class="form-group" style="position: relative;">
+                <input name="name" placeholder="Название тарифа" required class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input type="number" min="1" name="duration_days" placeholder="Срок (дней)" required class="t-input">
+            </div>
+            <div class="form-group" style="position: relative;">
+                <input type="number" min="0" step="0.01" name="price" placeholder="Стоимость" required class="t-input">
+            </div>
+            <button type="submit" class="btn btn-ghost">Создать тариф</button>
+        </form>
+        <div class="table-responsive">
+            <table>
+                <tr><th>План</th><th>Длительность</th><th>Цена</th></tr>
+                {% for m in memberships %}
+                    <tr><td>{{ m.name }}</td><td>{{ m.duration_days }} дн.</td><td>{{ m.price }}</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<!-- Report (Full Width) -->
+<section class="card" id="visits-report-section" style="margin-top: 1.5rem;">
+    <div class="card-header" style="margin-bottom: 1rem;">
+        <h2>Аналитика визитов</h2>
+    </div>
+    
+    <!-- Quick periods -->
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <button type="button" class="btn btn-ghost" style="padding: 0.4rem 1rem; font-size: 0.8rem; border-radius: 50px;" onclick="setPeriodAndSubmit('today')">Сегодня</button>
+        <button type="button" class="btn btn-ghost" style="padding: 0.4rem 1rem; font-size: 0.8rem; border-radius: 50px;" onclick="setPeriodAndSubmit('yesterday')">Вчера</button>
+        <button type="button" class="btn btn-ghost" style="padding: 0.4rem 1rem; font-size: 0.8rem; border-radius: 50px;" onclick="setPeriodAndSubmit('week')">Неделя</button>
+        <button type="button" class="btn btn-ghost" style="padding: 0.4rem 1rem; font-size: 0.8rem; border-radius: 50px;" onclick="setPeriodAndSubmit('month')">Месяц</button>
+    </div>
+
+    <!-- Date inputs & actions -->
+    <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+        <form id="report-form" method="post" action="/report" style="display: flex; gap: 1rem; flex: 1; flex-wrap: wrap; margin: 0;" data-ajax="false" novalidate>
+            <div class="form-group" style="position: relative; flex: 1; min-width: 140px;">
+                <input type="date" id="date_from" name="date_from" value="{{ date_from or '' }}" required class="t-input">
+            </div>
+            <div class="form-group" style="position: relative; flex: 1; min-width: 140px;">
+                <input type="date" id="date_to" name="date_to" value="{{ date_to or '' }}" required class="t-input">
+            </div>
+            <button type="submit" class="btn" style="flex: 0 0 auto; white-space: nowrap;">Построить отчет</button>
+        </form>
+        
+        {% if report_rows is not none %}
+            <form method="get" action="/report/export" style="margin: 0;" data-ajax="false">
+                <input type="hidden" name="date_from" value="{{ date_from }}">
+                <input type="hidden" name="date_to" value="{{ date_to }}">
+                <button type="submit" class="btn btn-ghost" style="border-color: rgba(255,255,255,0.4); color: #ffffff; white-space: nowrap; height: 100%;">Скачать CSV</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <script>
+    function setPeriodAndSubmit(period) {
+        const today = new Date();
+        let fromDate = new Date();
+        let toDate = new Date();
+
+        if (period === 'today') {
+            // Already initialized to today
+        } else if (period === 'yesterday') {
+            fromDate.setDate(today.getDate() - 1);
+            toDate.setDate(today.getDate() - 1);
+        } else if (period === 'week') {
+            fromDate.setDate(today.getDate() - 6);
+        } else if (period === 'month') {
+            fromDate.setDate(today.getDate() - 29);
+        }
+
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        document.getElementById('date_from').value = formatDate(fromDate);
+        document.getElementById('date_to').value = formatDate(toDate);
+        
+        document.getElementById('report-form').requestSubmit();
+    }
+    </script>
+    
+    {% if report_rows is not none %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr><th>Участник</th><th>Персональный тренер</th><th>Дата</th><th>Детали</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in report_rows %}
+                        <tr>
+                            <td>{{ r.client.full_name }}</td>
+                            <td>{{ r.trainer.full_name if r.trainer else 'Без тренера' }}</td>
+                            <td>{{ r.visit_date }}</td>
+                            <td>{{ r.note or '-' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+
+<script>
+document.querySelectorAll('form[novalidate]').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+        const inputs = this.querySelectorAll('input[required], select[required]');
+        
+        inputs.forEach(input => {
+            if (!input.value.trim()) {
+                isValid = false;
+                showError(input, "Это поле обязательно");
+            } else if (input.pattern && !new RegExp(input.pattern).test(input.value)) {
+                isValid = false;
+                showError(input, input.title || "Неверный формат");
+            } else if (input.minLength && input.value.length < input.minLength) {
+                isValid = false;
+                showError(input, `Минимум ${input.minLength} символов`);
+            } else {
+                clearError(input);
+            }
+            
+            // Clear error when user starts typing/changing the value
+            input.addEventListener('input', function() {
+                clearError(this);
+            }, { once: true });
+        });
+        
+        if (!isValid) {
+            e.preventDefault();
+        }
+    });
+});
+
+function showError(input, msgText) {
+    const wrap = input.closest('.form-group');
+    if (!wrap) return;
+    wrap.classList.add('is-error');
+    input.classList.remove('is-shaking');
+    void input.offsetWidth; // force reflow
+    input.classList.add('is-error', 'is-shaking');
+    
+    let msg = wrap.querySelector('.t-error-msg');
+    if (!msg) {
+        msg = document.createElement('p');
+        msg.className = 't-error-msg';
+        wrap.appendChild(msg);
+    }
+    msg.textContent = msgText;
+}
+
+function clearError(input) {
+    const wrap = input.closest('.form-group');
+    if (!wrap) return;
+    wrap.classList.remove('is-error');
+    input.classList.remove('is-error', 'is-shaking');
+}
+</script>
+{% endblock %}

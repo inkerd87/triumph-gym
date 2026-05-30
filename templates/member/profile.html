@@ -1,0 +1,78 @@
+{% extends "member/base.html" %}
+{% block title %}Триумф — профиль{% endblock %}
+
+{% block shell %}
+<div class="member-shell">
+    {% include 'member/_decor.html' %}
+    <header class="member-header member-header--float member-header--minimal">
+        <a href="{{ url_for('member.home') }}" class="member-back" aria-label="Назад">←</a>
+        <span class="member-header-title">Профиль</span>
+    </header>
+
+    <main class="member-main member-stagger">
+        <section class="member-page-hero">
+            <p class="member-hero-label">Аккаунт</p>
+            <h1 class="member-text-shine">{{ client.full_name.split()[0] if client.full_name else 'Профиль' }}</h1>
+            <p>{{ category_label(client.category) }} · {{ client.phone }}</p>
+        </section>
+        {% with messages = get_flashed_messages() %}
+            {% for message in messages %}<p class="member-flash">{{ message }}</p>{% endfor %}
+        {% endwith %}
+
+        <section class="member-card member-glass">
+            <h2>Email</h2>
+            <div class="member-list-item"><span>Почта</span><strong>{{ client.email or '—' }}</strong></div>
+        </section>
+
+        <section class="member-card member-glass">
+            <h2>Абонементы</h2>
+            {% for cm in memberships %}
+            <div class="member-list-item">
+                <div>
+                    <strong>{{ cm.membership.name if cm.membership else 'Тариф' }}</strong><br>
+                    <span class="muted">{{ cm.start_date.strftime('%d.%m.%Y') }} — {{ cm.end_date.strftime('%d.%m.%Y') }}</span>
+                </div>
+                {% if cm.end_date >= today %}
+                <span class="member-badge">Активен</span>
+                {% else %}
+                <span class="muted" style="font-size:0.65rem;">Истёк</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="member-empty">Нет абонементов</p>
+            {% endfor %}
+        </section>
+
+        <section class="member-card member-glass">
+            <h2>Мои визиты</h2>
+            {% for v in visits %}
+            <div class="member-list-item">
+                <span>{{ v.visit_date.strftime('%d.%m.%Y') }}</span>
+                <span class="muted">{% if v.trainer %}{{ v.trainer.full_name }}{% else %}Зал{% endif %}</span>
+            </div>
+            {% else %}
+            <p class="member-empty">Визитов пока нет</p>
+            {% endfor %}
+        </section>
+
+        <section class="member-card member-glass">
+            <h2>Сменить PIN</h2>
+            <form method="post" class="member-form">
+                <input name="current_pin" type="password" inputmode="numeric" placeholder="Текущий PIN" required maxlength="8">
+                <input name="new_pin" type="password" inputmode="numeric" placeholder="Новый PIN (4–8 цифр)" required minlength="4" maxlength="8">
+                <input name="confirm_pin" type="password" inputmode="numeric" placeholder="Повторите PIN" required maxlength="8">
+                <button type="submit" class="member-btn">Сохранить PIN</button>
+            </form>
+            {% if client.uses_default_pin %}
+            <p class="muted" style="font-size:0.75rem; margin-top:0.75rem;">Сейчас используются последние 4 цифры телефона</p>
+            {% endif %}
+        </section>
+
+        <form method="post" action="{{ url_for('member.logout') }}" class="member-logout-form">
+            <button type="submit" class="member-btn member-btn--ghost">Выйти</button>
+        </form>
+    </main>
+
+    {% include 'member/_nav.html' %}
+</div>
+{% endblock %}
