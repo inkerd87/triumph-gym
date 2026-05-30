@@ -226,11 +226,32 @@ def get_dashboard_data(db):
         "top_visitors": top_visitors,
         "expiring_soon": expiring_soon,
         "in_gym_count": count_in_gym(db),
+        "allow_demo_seed": os.getenv("ALLOW_DEMO_SEED") == "1",
     }
 
 def category_label(value):
     labels = {"client": "Клиент", "vip": "VIP клиент", "trainer": "Тренер"}
     return labels.get(value, "Клиент")
+
+class DemoSeedView(MethodView):
+    """Одноразовая заливка демо-данных без Render Shell (нужен ALLOW_DEMO_SEED=1)."""
+    decorators = [login_required]
+
+    def post(self):
+        if os.getenv("ALLOW_DEMO_SEED") != "1":
+            flash("Демо-заливка отключена.")
+            return redirect(url_for("index"))
+        try:
+            from populate_db import populate
+            from populate_schedule import populate_schedule
+
+            populate()
+            populate_schedule()
+            flash("Демо-данные загружены: клиенты, тренеры, тарифы, визиты и расписание.")
+        except Exception as e:
+            flash(f"Ошибка заливки: {e}")
+        return redirect(url_for("index"))
+
 
 class IndexView(MethodView):
     decorators = [login_required]
@@ -854,6 +875,7 @@ app.add_url_rule("/attendance", view_func=AttendanceCreateView.as_view("attendan
 app.add_url_rule("/attendance/checkout", view_func=AttendanceCheckoutView.as_view("attendance_checkout"))
 app.add_url_rule("/report", view_func=ReportView.as_view("report"))
 app.add_url_rule("/report/export", view_func=ReportExportView.as_view("report_export"))
+app.add_url_rule("/admin/seed-demo", view_func=DemoSeedView.as_view("seed_demo"), methods=["POST"])
 
 from member_portal import member_bp
 app.register_blueprint(member_bp)

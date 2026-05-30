@@ -64,6 +64,19 @@
     <a href="/clients" class="btn btn-ghost">Все клиенты</a>
 </div>
 
+{% if allow_demo_seed %}
+<section class="card" style="margin-bottom: 1.5rem; border-color: rgba(225, 6, 0, 0.4);">
+    <h3 style="margin-bottom: 0.5rem;">Демо-данные</h3>
+    <p class="muted" style="font-size: 0.85rem; margin-bottom: 1rem;">
+        Зальёт тестовых клиентов, тренеров и расписание. Старые клиенты и визиты будут удалены.
+        После заливки уберите переменную <code>ALLOW_DEMO_SEED</code> в Render.
+    </p>
+    <form method="post" action="{{ url_for('seed_demo') }}" onsubmit="return confirm('Заменить данные демо-набором?');">
+        <button type="submit" class="btn">Загрузить демо-данные</button>
+    </form>
+</section>
+{% endif %}
+
 <!-- Modals -->
 <div class="modal-overlay" id="modal-add-client">
     <div class="modal-content">
